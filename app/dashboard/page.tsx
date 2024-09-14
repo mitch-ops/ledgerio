@@ -25,6 +25,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import { useGroups } from "../GroupsContext";
 
 type GroupProps = {
   id: string;
@@ -33,71 +34,9 @@ type GroupProps = {
   amount: number;
 };
 
-const supabase = createClient();
+// const supabase = createClient();
 export default function Dashboard() {
-  const [groups, setGroups] = useState<GroupProps[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  async function fetchuserGroupIds() {
-    setIsLoading(true);
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError) {
-      console.error("User Error:", userError);
-      setIsLoading(false);
-      return null;
-    }
-
-    if (!user) {
-      console.error("No user found");
-      setIsLoading(false);
-      return null;
-    }
-    const { data: userGroupIds, error: fetchError } = await supabase
-      .from("group_memberships")
-      .select("*")
-      .eq("user_id", user.id);
-
-    console.log(userGroupIds);
-    if (!userGroupIds) {
-      console.error("Groups error");
-      setIsLoading(false);
-      return;
-    }
-
-    // for each id get that group
-
-    const groupPromises = userGroupIds.map(async (membership) => {
-      const { data: group, error: groupError } = await supabase
-        .from("groups")
-        .select("*")
-        .eq("id", membership.group_id)
-        .single();
-
-      if (groupError) {
-        console.error("Error fetching group:", groupError);
-        setIsLoading(false);
-        return null;
-      }
-      setIsLoading(false);
-      return group;
-    });
-
-    const userGroups = (await Promise.all(groupPromises)).filter(Boolean);
-    setGroups(userGroups as GroupProps[]);
-  }
-
-  useEffect(() => {
-    fetchuserGroupIds();
-  }, []);
-
-  useEffect(() => {
-    console.log("groups", groups);
-  }, [groups]);
+  const { groups, isLoading } = useGroups();
 
   return (
     <div className="flex flex-col h-full">

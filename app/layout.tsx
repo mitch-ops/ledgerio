@@ -2,6 +2,7 @@ import { GeistSans } from "geist/font/sans";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { Navigation } from "@/components/navbar";
+import { GroupsProviderClient } from "./GroupsContext";
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -30,7 +31,7 @@ export default function RootLayout({
           <div className="min-h-screen flex flex-col">
             <Navigation />
             <main className="flex-1 flex flex-col max-w-5xl w-full mx-auto px-5 py-8 overflow-hidden">
-              {children}
+              <GroupsProviderClient>{children}</GroupsProviderClient>
             </main>
           </div>
         </ThemeProvider>
