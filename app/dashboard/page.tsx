@@ -1,5 +1,4 @@
-import React from "react";
-import { Button } from "@/components/ui/button";
+import React, { useState } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -10,30 +9,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
+import { InputForm } from "@/components/CreateGroup";
 
-import { createClient } from '@/utils/supabase/server';
-
-const supabase = createClient();
-
-type group = {
-  groupName: string;
-  createdBy: string;
-}
-
-const createGroup = async (group: group) => {
-  // Insert the new group into the 'groups' table in Supabase
-  const { data, error } = await supabase
-    .from('groups')
-    .insert([group])
-
-  if (error) {
-    console.error('Error creating group:', error.message);
-    return null;
-  }
-
-  console.log('Group created successfully:', data);
-  return data;
-};
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function Dashboard() {
   return (
@@ -83,9 +72,22 @@ export default function Dashboard() {
         </div>
 
         <footer className="mt-6 w-full flex justify-center">
-          <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white max-w-xl">
-            Create Group
-          </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="w-full max-w-xl bg-white dark:bg-blue-600 dark:text-white shadow-sm rounded-full">
+                Create Group
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Edit profile</DialogTitle>
+                <DialogDescription>
+                  Give your group a cool name. You can change it later.
+                </DialogDescription>
+              </DialogHeader>
+              <InputForm />
+            </DialogContent>
+          </Dialog>
         </footer>
       </div>
     </div>
