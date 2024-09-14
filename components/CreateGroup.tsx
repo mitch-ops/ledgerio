@@ -17,16 +17,50 @@ import { Input } from "@/components/ui/input";
 
 import { createClient } from "@/utils/supabase/client";
 import { redirect } from "next/navigation";
+import { v4 as uuidv4 } from "uuid";
+
 const supabase = createClient();
 
 type group = {
+  id?: string;
   name: string;
   created_by: string;
 };
 
 const createGroup = async (group: group) => {
   // Insert the new group into the 'groups' table in Supabase
-  const { data, error } = await supabase.from("groups").insert([group]);
+  let groupuuid = uuidv4();
+  group.id = groupuuid;
+
+  console.log(group);
+  const { data: insertData, error: insertError } = await supabase
+    .from("groups")
+    .insert([group]);
+
+  if (insertError) {
+    console.error("Error creating group:", insertError);
+  }
+
+  // Retrieve the user from Supabase auth
+  const { data: userResponse, error: userError } =
+    await supabase.auth.getUser();
+
+  if (userError) {
+    console.error("Error fetching user:", userError);
+    return "error: Not authenticated";
+  }
+
+  const user = userResponse?.user;
+  if (!user) {
+    console.error("User not found");
+    return "error: Not authenticated";
+  }
+
+  const userId = user.id; // Access the user ID
+
+  const { data, error } = await supabase
+    .from("group_memberships")
+    .insert({ user_id: userId, group_id: groupuuid, role: "admin" });
 
   if (error) {
     console.error("Error creating group:", error.message);

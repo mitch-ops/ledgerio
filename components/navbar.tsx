@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sheet";
 import Link from "next/link";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { signOutAction } from "@/app/actions";
 
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
@@ -30,6 +31,11 @@ export function Navigation() {
     { id: 2, name: "Birthday Party" },
     { id: 3, name: "Spring Break" },
   ];
+
+  const handleSignOut = () => {
+    setIsOpen(false);
+    signOutAction();
+  };
 
   return (
     <div className="flex items-center space-x-2 bg-white dark:bg-slate-800 shadow-sm">
@@ -105,7 +111,7 @@ export function Navigation() {
                 </Link>
                 <button
                   className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100 transition-colors"
-                  onClick={() => setIsOpen(false)}
+                  onClick={handleSignOut}
                 >
                   <LogOut className="h-5 w-5" />
                   <span>Log Out</span>
