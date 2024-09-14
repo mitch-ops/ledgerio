@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { createClient } from "@/utils/supabase/client";
+import { v4 as uuidv4 } from "uuid";
 
 const supabase = createClient();
 
@@ -87,9 +88,10 @@ export default function GroupDetails({
     // console.log(id);
 
     // Insert the new invitation into the 'invitations' table, Supabase generates the UUID automatically
+    let inviteuuid = uuidv4();
     const { data, error } = await supabase
       .from("invitations")
-      .insert([{ group_id: id, inviter_id: userId }]);
+      .insert([{ id: inviteuuid, group_id: id, inviter_id: userId }]);
 
     if (error) {
       console.error("Error creating invitation:", error);
@@ -97,7 +99,7 @@ export default function GroupDetails({
     }
 
     // Use the UUID `id` from the newly created invitation as the token
-    const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/join-group/${id}`;
+    const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/join-group/${inviteuuid}`;
 
     setInviteLink(inviteLink);
   }
