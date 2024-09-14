@@ -11,6 +11,30 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 
+import { createClient } from '@/utils/supabase/server';
+
+const supabase = createClient();
+
+type group = {
+  groupName: string;
+  createdBy: string;
+}
+
+const createGroup = async (group: group) => {
+  // Insert the new group into the 'groups' table in Supabase
+  const { data, error } = await supabase
+    .from('groups')
+    .insert([group])
+
+  if (error) {
+    console.error('Error creating group:', error.message);
+    return null;
+  }
+
+  console.log('Group created successfully:', data);
+  return data;
+};
+
 export default function Dashboard() {
   return (
     <div className="flex flex-col h-full">
