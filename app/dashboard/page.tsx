@@ -31,10 +31,15 @@ export default function Dashboard() {
         <h2 className="text-2xl font-bold mb-4">Welcome, Nick</h2>
         <div className="space-y-4">
           {[
-            { id: 1, name: "Beach Trip '24", members: 4, amount: -20.0 },
-            { id: 2, name: "Birthday Party", members: 12, amount: -5.33 },
-            { id: 3, name: "Spring Break", members: 7, amount: 200.79 },
-            { id: 4, name: "Birthday Trip '21", members: 3, amount: 21.33 },
+            {
+              id: "79e7a212-70fe-4a92-b4c2-6d15bb1acf9a",
+              name: "Beach Trip '24",
+              members: 4,
+              amount: -20.0,
+            },
+            { id: "2", name: "Birthday Party", members: 12, amount: -5.33 },
+            { id: "3", name: "Spring Break", members: 7, amount: 200.79 },
+            { id: "4", name: "Birthday Trip '21", members: 3, amount: 21.33 },
           ].map((group) => (
             <Link href={`/groups/${group.id}`} key={group.id}>
               <Card className="bg-gray-800 border-gray-700 my-4 bg-white dark:bg-slate-800 shadow-sm">

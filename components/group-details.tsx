@@ -1,10 +1,13 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { PenSquare, Plus, ChevronRight} from "lucide-react";
+import { PenSquare, Plus, ChevronRight, UserPlus } from "lucide-react";
 import Link from "next/link";
-import { Copy } from "lucide-react"
+import { Copy } from "lucide-react";
+import { User } from "@supabase/supabase-js";
 
 import {
   Dialog,
@@ -15,9 +18,19 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+import { createClient } from "@/utils/supabase/client";
+
+const supabase = createClient();
+
+type invite = {
+  id?: string;
+  group_id: string;
+  inviter_id: string;
+};
 
 export type Transaction = {
   id: number;
@@ -30,7 +43,7 @@ export type Transaction = {
 };
 
 type GroupDetailsProps = {
-  id: number;
+  id: string;
   groupName: string;
   balance: number;
   transactions: Transaction[];
@@ -50,6 +63,44 @@ export default function GroupDetails({
 }: GroupDetailsProps) {
   // Show only the first 3 transactions
   const displayedTransactions = transactions.slice(0, 3);
+
+  const [inviteLink, setInviteLink] = useState("");
+
+  async function create_invite() {
+    // Retrieve the user from Supabase auth
+    const { data: userResponse, error: userError } =
+      await supabase.auth.getUser();
+
+    if (userError) {
+      console.error("Error fetching user:", userError);
+      return "error: Not authenticated";
+    }
+
+    const user = userResponse?.user;
+    if (!user) {
+      console.error("User not found");
+      return "error: Not authenticated";
+    }
+
+    const userId = user.id; // Access the user ID
+
+    // console.log(id);
+
+    // Insert the new invitation into the 'invitations' table, Supabase generates the UUID automatically
+    const { data, error } = await supabase
+      .from("invitations")
+      .insert([{ group_id: id, inviter_id: userId }]);
+
+    if (error) {
+      console.error("Error creating invitation:", error);
+      return "error: Error creating invitation";
+    }
+
+    // Use the UUID `id` from the newly created invitation as the token
+    const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/join-group/${id}`;
+
+    setInviteLink(inviteLink);
+  }
 
   return (
     <div className="bg-gray-900 text-white p-4 min-h-screen w-full mx-auto">
@@ -137,43 +188,45 @@ export default function GroupDetails({
       >
         <Plus className="h-6 w-6" />
       </Button>
-        
+
       <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="outline">Invite</Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Share link</DialogTitle>
-          <DialogDescription>
-            Anyone who has this link will be able to view this.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex items-center space-x-2">
-          <div className="grid flex-1 gap-2">
-            <Label htmlFor="link" className="sr-only">
-              Link
-            </Label>
-            <Input
-              id="link"
-              defaultValue="https://ui.shadcn.com/docs/installation"
-              readOnly
-            />
-          </div>
-          <Button type="submit" size="sm" className="px-3">
-            <span className="sr-only">Copy</span>
-            <Copy className="h-4 w-4" />
+        <DialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="fixed bottom-4 left-4 bg-slate-700 hover:bg-slate-800 rounded-full h-12 w-12"
+          >
+            <UserPlus className="h-6 w-6" />
           </Button>
-        </div>
-        <DialogFooter className="sm:justify-start">
-          <DialogClose asChild>
-            <Button type="button" variant="secondary">
-              Close
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share link</DialogTitle>
+            <DialogDescription>
+              Anyone who has this link will be able to view this.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2">
+            <div className="grid flex-1 gap-2">
+              <Label htmlFor="link" className="sr-only">
+                Link
+              </Label>
+              <Input id="link" value={inviteLink} readOnly />
+            </div>
+            <Button type="submit" size="sm" className="px-3">
+              <span className="sr-only">Copy</span>
+              <Copy className="h-4 w-4" />
             </Button>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </div>
+          <DialogFooter className="sm:justify-start">
+            <DialogClose asChild>
+              <Button type="button" variant="secondary">
+                Close
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
