@@ -195,6 +195,7 @@ export default function GroupDetails({
             variant="ghost"
             size="icon"
             className="fixed bottom-4 left-4 bg-slate-700 hover:bg-slate-800 rounded-full h-12 w-12"
+            onClick={create_invite}
           >
             <UserPlus className="h-6 w-6" />
           </Button>

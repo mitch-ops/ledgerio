@@ -1,5 +1,6 @@
 import GroupDetails, { Transaction } from "@/components/group-details";
 import { notFound } from "next/navigation"; // To handle 404 errors
+import { createClient } from "@/utils/supabase/client";
 
 type GroupProps = {
   id: string;
@@ -18,6 +19,8 @@ type User = {
   name: string;
   initials: string;
 };
+
+const supabase = createClient();
 
 const groups: GroupProps[] = [
   {
