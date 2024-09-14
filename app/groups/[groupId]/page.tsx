@@ -1,6 +1,9 @@
+"use client";
+
 import GroupDetails, { Transaction } from "@/components/group-details";
 import { notFound } from "next/navigation"; // To handle 404 errors
 import { createClient } from "@/utils/supabase/client";
+import { useGroups } from "@/app/GroupsContext";
 
 type GroupProps = {
   id: string;
@@ -21,18 +24,6 @@ type User = {
 };
 
 const supabase = createClient();
-
-const groups: GroupProps[] = [
-  {
-    id: "79e7a212-70fe-4a92-b4c2-6d15bb1acf9a",
-    name: "Beach Trip '24",
-    members: 4,
-    amount: -20.0,
-  },
-  { id: "2", name: "Birthday Party", members: 12, amount: -5.33 },
-  { id: "3", name: "Spring Break", members: 7, amount: 200.79 },
-  { id: "4", name: "Birthday Trip '21", members: 3, amount: 21.33 },
-];
 
 const transactions: Transaction[] = [
   {
@@ -65,6 +56,7 @@ const ponyUpUsers: PonyUpUser[] = [
 
 // Dynamic group page component
 const GroupPage = ({ params }: { params: { groupId: string } }) => {
+  const { groups } = useGroups();
   const group = groups.find((g) => g.id === params.groupId);
 
   if (!group) {
