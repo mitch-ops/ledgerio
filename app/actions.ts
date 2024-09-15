@@ -34,7 +34,7 @@ export const signUpAction = async (formData: FormData) => {
   if (data && data.user) {
     // Insert the user into the custom users table
     const { data: insertResponse, error: insertError } = await supabase
-      .from("public.users")
+      .from("users")
       .insert({
         id: data.user.id, // Match UUID from Supabase Auth
         email: data.user.email,

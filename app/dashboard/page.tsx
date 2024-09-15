@@ -34,14 +34,70 @@ type GroupProps = {
   amount: number;
 };
 
-// const supabase = createClient();
+const supabase = createClient();
 export default function Dashboard() {
   const { groups, isLoading } = useGroups();
+  const [name, setName] = useState<string | null>("User");
+
+  useEffect(() => {
+    async function getUserIdFromEmail(email: string): Promise<string | null> {
+      try {
+        // Query the 'users' table to get the user first name associated with the email
+        const { data, error } = await supabase
+          .from("users")
+          .select("first_name")
+          .eq("email", email)
+          .single(); // Assuming emails are unique
+
+        if (error) {
+          console.error("Error fetching user first name:", error.message);
+          return null;
+        }
+
+        if (!data) {
+          console.error("No data found for the provided email.");
+          return null;
+        }
+
+        return data.first_name;
+      } catch (err) {
+        console.error("Unexpected error fetching user first name:", err);
+        return null;
+      }
+    }
+
+    async function fetchUserName() {
+      try {
+        const { data: userResponse, error: userError } =
+          await supabase.auth.getUser();
+
+        if (userError) {
+          console.error("Error fetching user:", userError.message);
+          return;
+        }
+
+        if (!userResponse || !userResponse.user || !userResponse.user.email) {
+          console.error("No user or email found.");
+          return;
+        }
+
+        const userEmail = userResponse.user.email;
+        const userName = await getUserIdFromEmail(userEmail);
+        if (userName) {
+          setName(userName);
+        }
+      } catch (err) {
+        console.error("Unexpected error fetching user:", err);
+      }
+    }
+
+    fetchUserName();
+  }, []);
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-auto">
-        <h2 className="text-2xl font-bold mb-4">Welcome, Nick</h2>
+        <h2 className="text-2xl font-bold mb-4">Welcome, {name}</h2>
         <div className="space-y-4">
           {isLoading && (
             <div className="w-full flex justify-center">
@@ -55,12 +111,9 @@ export default function Dashboard() {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold">{group.name}</h3>
-                      <p className="text-sm text-gray-400">
-                        {group.members} members
-                      </p>
                     </div>
                     <DropdownMenu>
-                      <DropdownMenuTrigger>...</DropdownMenuTrigger>
+                      <DropdownMenuTrigger className="">...</DropdownMenuTrigger>
                       <DropdownMenuContent>
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
@@ -71,14 +124,6 @@ export default function Dashboard() {
                     </DropdownMenu>
                   </div>
                 </CardContent>
-                <CardFooter className="p-4 pt-0">
-                  <p
-                    className={`text-lg font-semibold ${group.amount < 0 ? "text-red-500" : "text-green-500"}`}
-                  >
-                    {group.amount < 0 ? "-" : ""}$
-                    {Math.abs(group.amount).toFixed(2)}
-                  </p>
-                </CardFooter>
               </Card>
             </Link>
           ))}
