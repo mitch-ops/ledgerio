@@ -4,10 +4,21 @@ import React, { useState } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { PenSquare, Plus, ChevronRight, UserPlus } from "lucide-react";
+import {
+  PenSquare,
+  Plus,
+  ChevronRight,
+  UserPlus,
+  DollarSign,
+  HandCoins,
+} from "lucide-react";
 import Link from "next/link";
 import { Copy } from "lucide-react";
-import { User } from "@supabase/supabase-js";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 import {
   Dialog,
@@ -24,6 +35,7 @@ import { Label } from "@/components/ui/label";
 
 import { createClient } from "@/utils/supabase/client";
 import { v4 as uuidv4 } from "uuid";
+import { Separator } from "./ui/separator";
 
 const supabase = createClient();
 
@@ -183,13 +195,28 @@ export default function GroupDetails({
         </CardContent>
       </Card>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="fixed bottom-4 right-4 bg-blue-600 hover:bg-blue-700 rounded-full h-12 w-12"
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="fixed bottom-4 right-4 bg-blue-600 hover:bg-blue-700 rounded-full h-12 w-12"
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-full">
+          <div className="w-full justify-between items-center">
+            <Button variant={"ghost"}>
+              <DollarSign className="h-4 w-4 mr-2" />
+              Pay
+            </Button>
+            <Button variant={"ghost"}>
+              <HandCoins className="h-4 w-4 mr-2" /> Request
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
 
       <Dialog>
         <DialogTrigger asChild>
