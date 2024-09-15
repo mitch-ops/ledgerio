@@ -237,6 +237,80 @@ export default function GroupDetails({
   /**********************************
    * pay/request backend ends
    **********************************/
+
+  /**
+   * pony up handle here
+   */
+  const [refreshedTransactions, setRefreshedTransactions] = useState(transactions); // Store updated transactions
+  const [updatedPonyUpUser, setUpdatedPonyUpUser] = useState(ponyUpUser); // Track the current state of Pony Up user
+  const [showPonyUp, setShowPonyUp] = useState(true); // Track the visibility of the Pony Up card
+  // Function to fetch updated transactions after payment
+  const fetchUpdatedTransactions = async () => {
+    const { data: updatedTxns, error } = await supabase
+      .from("transactions")
+      .select("*")
+      .eq("group_id", id);
+
+    if (error) {
+      setErrorMessage("Error fetching updated transactions.");
+      return;
+    }
+
+    // Update the state with the newly fetched transactions
+    setRefreshedTransactions(updatedTxns);
+
+    // Check if there are any remaining pending payments
+    const pendingUser = updatedTxns.find(
+      (txn) => txn.paid_by === id && txn.status === "pending"
+    );
+
+    // Update the Pony Up card only if there are pending transactions for the user
+    if (!pendingUser) {
+      //setUpdatedPonyUpUser(null); // No pending transactions, remove the Pony Up user card
+    }
+  };
+
+  // Handle Pony Up (Pay button click)
+  const handlePonyUp = async () => {
+
+    try {
+      // Get the authenticated user
+      const { data: userResponse, error: userError } = await supabase.auth.getUser();
+      if (userError || !userResponse?.user) {
+        throw new Error("User is not authenticated");
+      }
+
+      const userId = userResponse.user.id;
+
+      // Update the transactions where the logged-in user is "owed" by ponyUpUser
+      const { error: updateError } = await supabase
+        .from("transactions")
+        .update({ status: "paid" })
+        .eq("group_id", id)  // Match the group
+        .eq("owed_by", userId)  // The current user owes the ponyUpUser
+        .eq("paid_by", id)  // Match the ponyUpUser who is owed
+        .eq("status", "pending");  // Only update pending transactions
+
+      if (updateError) {
+        throw new Error("Error updating transactions: " + updateError.message);
+      }
+
+      // After successful payment, refresh or hide the Pony Up card
+      setLoading(false);
+      alert("Transaction marked as paid!");
+      setShowPonyUp(false); // Hide the card
+      // Here you can refresh the page or update the UI to remove the ponyUpUser card
+      await fetchUpdatedTransactions();
+
+    } catch (error) {
+      setErrorMessage((error as Error).message);
+      setLoading(false);
+    }
+  };
+  /**
+   * End pony handle
+   */
+
   return (
     <div className="bg-gray-900 text-white p-4 min-h-screen w-full mx-auto">
       <div className="flex justify-between items-center mb-4">
@@ -263,7 +337,7 @@ export default function GroupDetails({
             key={transaction.id}
             className="flex items-center justify-between bg-gray-800 p-3 rounded-lg"
           >
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 ">
               <Avatar className="h-8 w-8 bg-gray-600">
                 <AvatarFallback>{transaction.user.initials}</AvatarFallback>
               </Avatar>
@@ -294,7 +368,7 @@ export default function GroupDetails({
         </Link>
       )}
 
-      <h2 className="text-lg font-semibold mb-2">Pony Up</h2>
+      {/* <h2 className="text-lg font-semibold mb-2">Pony Up</h2>
       <Card className="bg-gray-800 border-gray-700">
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-2">
@@ -308,13 +382,45 @@ export default function GroupDetails({
             </Avatar>
             <div>
               <p className="font-medium">{ponyUpUser.name}</p>
-              <Button variant="secondary" size="sm" className="mt-1">
+              <Button variant="secondary" size="sm" className="mt-1" onClick={handlePonyUp}>
                 Pay
               </Button>
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
+
+      {showPonyUp && ponyUpUser && (
+        <>
+          <h2 className="text-lg font-semibold mb-2">Pony Up</h2>
+          <Card className="bg-gray-800 border-gray-700">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="font-semibold text-red-500">
+                  ${Math.abs(ponyUpUser.amount).toFixed(2)}
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Avatar className="h-12 w-12 bg-gray-600">
+                  <AvatarFallback>{ponyUpUser.initials}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">{ponyUpUser.name}</p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="mt-1"
+                    onClick={handlePonyUp}
+                    disabled={loading}
+                  >
+                    {loading ? "Processing..." : "Pay"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       <Popover>
         <PopoverTrigger asChild>
