@@ -28,6 +28,13 @@ export default function Signup({ searchParams }: { searchParams: Message }) {
         <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
           <Label htmlFor="email">Email</Label>
           <Input name="email" placeholder="you@example.com" required />
+
+          <Label htmlFor="first_name">First Name</Label>
+          <Input name="first_name" placeholder="John" required />
+
+          <Label htmlFor="last_name">Last Name</Label>
+          <Input name="last_name" placeholder="Doe" required />
+
           <Label htmlFor="password">Password</Label>
           <Input
             type="password"
@@ -36,9 +43,11 @@ export default function Signup({ searchParams }: { searchParams: Message }) {
             minLength={6}
             required
           />
+
           <SubmitButton formAction={signUpAction} pendingText="Signing up...">
             Sign up
           </SubmitButton>
+
           <FormMessage message={searchParams} />
         </div>
       </form>

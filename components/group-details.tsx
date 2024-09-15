@@ -20,6 +20,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
+import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import {
   Dialog,
   DialogClose,
@@ -35,7 +38,7 @@ import { Label } from "@/components/ui/label";
 
 import { createClient } from "@/utils/supabase/client";
 import { v4 as uuidv4 } from "uuid";
-import { Separator } from "./ui/separator";
+import { Combobox } from "./ui/combobox";
 
 const supabase = createClient();
 
@@ -124,17 +127,64 @@ export default function GroupDetails({
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [transactionsState, setTransactions] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<string>("");
-  const [amount, setAmount] = useState<number>(0);
   const [description, setDescription] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
 
+  const [recipient, setRecipient] = useState("John Doe");
+  const [amount, setAmount] = useState(0.0);
+  const [desc, setDesc] = useState("Drinks last night");
+
+  const [reqRecipient, setReqRecipient] = useState("John Doe");
+  const [reqAmount, setReqAmount] = useState(0.0);
+  const [reqDesc, setReqDesc] = useState("Drinks last night");
+
+  const handleSubmit = async (
+    event: React.FormEvent<HTMLFormElement>,
+    type: string
+  ) => {
+    event.preventDefault(); // Prevent the default form submission behavior
+
+    console.log("handle submit called");
+
+    // Validate form inputs
+    if (type === "pay") {
+      if (!selectedUser || amount <= 0 || !description) {
+        setErrorMessage("Please fill out all fields for payment.");
+        return;
+      }
+    } else if (type === "req") {
+      if (!reqRecipient || reqAmount <= 0 || !reqDesc) {
+        setErrorMessage("Please fill out all fields for request.");
+        return;
+      }
+    } else {
+      console.error("Invalid transaction type.");
+      return;
+    }
+
+    // Call the handleChargeSubmit function with the appropriate type
+    await handleChargeSubmit(type);
+
+    // Optionally reset form fields and close the dialog
+    if (type === "pay") {
+      setRecipient("");
+      setAmount(0);
+      setDescription("");
+    } else if (type === "req") {
+      setReqRecipient("");
+      setReqAmount(0);
+      setReqDesc("");
+    }
+  };
+
   // Fetch group members and transactions for the group when the page loads
   useEffect(() => {
     const fetchGroupDetails = async () => {
       setLoading(true);
-      const { data: userResponse, error: userError } = await supabase.auth.getUser();
+      const { data: userResponse, error: userError } =
+        await supabase.auth.getUser();
       const user = userResponse?.user;
 
       if (!user) {
@@ -179,9 +229,10 @@ export default function GroupDetails({
   }, [id]);
 
   // Handle form submission for charging a user
-  const handleChargeSubmit = async () => {
+  const handleChargeSubmit = async (type: string) => {
     setLoading(true);
-    const { data: userResponse, error: userError } = await supabase.auth.getUser();
+    const { data: userResponse, error: userError } =
+      await supabase.auth.getUser();
     const user = userResponse?.user;
 
     if (!user) {
@@ -192,31 +243,79 @@ export default function GroupDetails({
 
     const paidByUserId = user.id;
 
-    // Insert the transaction (charge) into the transactions table
-    const { data, error } = await supabase.from("transactions").insert([
-      {
-        group_id: id,
-        paid_by: paidByUserId,  // The current user charging someone
-        owed_by: selectedUser,  // The user selected to be charged
-        amount: parseFloat(amount.toString()),
-        description,
-        type: "charge",  // Mark it as a charge, need to change this depending on what was clicked
-        status: "pending",
-        created_at: new Date(),
-      },
-    ]);
+    async function getUserIdFromEmail(email: string): Promise<string | null> {
+      // Query the 'users' table to get the user ID associated with the email
+      const { data, error } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", email)
+        .single(); // Assuming emails are unique
 
-    if (error) {
-      setErrorMessage("Error charging user: " + error.message);
-      setLoading(false);
-      return;
+      if (error || !data) {
+        console.error("Error fetching user ID:", error);
+        return null;
+      }
+
+      return data.id;
+    }
+
+    const recId = await getUserIdFromEmail(reqRecipient);
+
+    console.log(recId);
+
+    if (type === "req") {
+      // Insert the transaction (charge) into the transactions table
+      const { data, error } = await supabase.from("transactions").insert([
+        {
+          group_id: id,
+          paid_by: paidByUserId, // The current user charging someone
+          owed_by: recId, // The user selected to be charged
+          amount: parseFloat(reqAmount.toString()),
+          description: reqDesc,
+          type: "charge", // Mark it as a charge, need to change this depending on what was clicked
+          status: "pending",
+          created_at: new Date(),
+        },
+      ]);
+
+      if (error) {
+        setErrorMessage("Error charging user: " + error.message);
+        setLoading(false);
+        return;
+      }
+    } else if (type === "pay") {
+      const recId = await getUserIdFromEmail(recipient);
+      const { data, error } = await supabase.from("transactions").insert([
+        {
+          group_id: id,
+          paid_by: paidByUserId, // The current user charging someone
+          owed_by: recId, // The user selected to be charged
+          amount: parseFloat(amount.toString()),
+          description,
+          type: "pay", // Mark it as a charge, need to change this depending on what was clicked
+          status: "pending",
+          created_at: new Date(),
+        },
+      ]);
+
+      if (error) {
+        setErrorMessage("Error charging user: " + error.message);
+        setLoading(false);
+        return;
+      }
+    } else {
+      console.error("Transaction failed");
     }
 
     // Clear the form and hide it
-    setSelectedUser("");
+    setRecipient("");
+    setReqRecipient("");
+
     setAmount(0);
+    setReqAmount(0);
+
     setDescription("");
-    setFormVisible(false);
+    setReqDesc("");
     setLoading(false);
 
     // Reload the transactions list
@@ -316,8 +415,10 @@ export default function GroupDetails({
         </CardContent>
       </Card>
 
-      <Popover>
-        <PopoverTrigger asChild>
+      {/* pay request form */}
+
+      <Dialog>
+        <DialogTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
@@ -325,19 +426,105 @@ export default function GroupDetails({
           >
             <Plus className="h-6 w-6" />
           </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-full">
-          <div className="w-full justify-between items-center">
-            <Button variant={"ghost"}>
-              <DollarSign className="h-4 w-4 mr-2" />
-              Pay
-            </Button>
-            <Button variant={"ghost"}>
-              <HandCoins className="h-4 w-4 mr-2" /> Request
-            </Button>
-          </div>
-        </PopoverContent>
-      </Popover>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[425px]">
+          <Tabs defaultValue="account" className="sm:max-w-[425px]">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="pay">Pay</TabsTrigger>
+              <TabsTrigger value="request">Request</TabsTrigger>
+            </TabsList>
+            <TabsContent value="pay">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pay</CardTitle>
+                  <CardDescription>
+                    Pay someone money you owe them.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <form onSubmit={(e) => handleSubmit(e, "pay")}>
+                    <div className="space-y-1">
+                      <Label htmlFor="recipient">Recipient</Label>
+                      <Input
+                        id="recipient"
+                        value={recipient}
+                        onChange={(e) => setRecipient(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="amount">Amount</Label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        value={amount}
+                        onChange={(e) => setAmount(parseFloat(e.target.value))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="desc">Description</Label>
+                      <Input
+                        id="desc"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                      />
+                    </div>
+                    <CardFooter>
+                      <Button type="submit">Submit</Button>
+                    </CardFooter>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="request">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Request</CardTitle>
+                  <CardDescription>
+                    Make a request for someone to owe you money.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <form onSubmit={(e) => handleSubmit(e, "req")}>
+                    <div className="space-y-1">
+                      <Label htmlFor="recipient">Recipient</Label>
+                      <Input
+                        id="recipient"
+                        value={reqRecipient}
+                        onChange={(e) => setReqRecipient(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="amount">Amount</Label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        value={reqAmount}
+                        onChange={(e) =>
+                          setReqAmount(parseFloat(e.target.value))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="desc">Description</Label>
+                      <Input
+                        id="desc"
+                        value={reqDesc}
+                        onChange={(e) => setReqDesc(e.target.value)}
+                      />
+                    </div>
+                    <CardFooter>
+                      <Button type="submit">Save request</Button>
+                    </CardFooter>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+
+      {/*  */}
 
       <Dialog>
         <DialogTrigger asChild>
