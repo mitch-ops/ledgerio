@@ -21,29 +21,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-const frameworks = [
-  {
-    value: "next.js",
-    label: "Next.js",
-  },
-  {
-    value: "sveltekit",
-    label: "SvelteKit",
-  },
-  {
-    value: "nuxt.js",
-    label: "Nuxt.js",
-  },
-  {
-    value: "remix",
-    label: "Remix",
-  },
-  {
-    value: "astro",
-    label: "Astro",
-  },
-];
-
 type ComboboxProps = {
   memberIds: string[];
 };
@@ -63,23 +40,22 @@ export function Combobox({ memberIds }: ComboboxProps) {
   // https://undzepswvqfhbzqhnvay.supabase.co
 
   async function getUserById(userId: string) {
-    const apiUrl = `https://your-supabase-url.supabase.co/auth/v1/admin/users/${userId}`;
-    const apiKey = "your-service-role-key"; // Replace with your service role key
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", userId)
+      .single(); // Assuming emails are unique
 
-    const response = await fetch(apiUrl, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      console.error("Error fetching user by UUID:", await response.text());
+    if (error) {
+      console.error("Error fetching user:", error.message);
       return null;
     }
 
-    const data = await response.json();
+    if (!data) {
+      console.error("No data found for the provided uuid.");
+      return null;
+    }
+
     return data;
   }
 

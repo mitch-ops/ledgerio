@@ -39,6 +39,9 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { v4 as uuidv4 } from "uuid";
 import { Combobox } from "./ui/combobox";
+import TransactionList from "./transaction-list";
+import Balance from "./balance";
+import { Badge } from "./ui/badge";
 
 const supabase = createClient();
 
@@ -48,21 +51,10 @@ type invite = {
   inviter_id: string;
 };
 
-export type Transaction = {
-  id: number;
-  user: {
-    name: string;
-    initials: string;
-  };
-  amount: number;
-  description: string;
-};
-
 type GroupDetailsProps = {
   id: string;
   groupName: string;
   balance: number;
-  transactions: Transaction[];
   ponyUpUser: {
     name: string;
     initials: string;
@@ -74,11 +66,29 @@ export default function GroupDetails({
   id,
   groupName,
   balance,
-  transactions,
   ponyUpUser,
 }: GroupDetailsProps) {
   // Show only the first 3 transactions
-  const displayedTransactions = transactions.slice(0, 3);
+
+  async function getUserById(userId: string) {
+    const { data, error } = await supabase
+      .from("users")
+      .select("first_name, last_name")
+      .eq("id", userId)
+      .single(); // Assuming emails are unique
+
+    if (error) {
+      console.error("Error fetching user:", error.message);
+      return null;
+    }
+
+    if (!data) {
+      console.error("No data found for the provided uuid.");
+      return null;
+    }
+
+    return data;
+  }
 
   const [inviteLink, setInviteLink] = useState("");
 
@@ -125,9 +135,8 @@ export default function GroupDetails({
 
   // Local state to manage group members, transactions, form data, and loading states
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
-  const [transactionsState, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<string>("");
-  const [description, setDescription] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -146,17 +155,20 @@ export default function GroupDetails({
   ) => {
     event.preventDefault(); // Prevent the default form submission behavior
 
-    console.log("handle submit called");
+    console.log("handle submit called", type);
 
     // Validate form inputs
     if (type === "pay") {
-      if (!selectedUser || amount <= 0 || !description) {
+      console.log("pay");
+      if (!recipient || amount <= 0 || !desc) {
+        console.log("errororror");
         setErrorMessage("Please fill out all fields for payment.");
         return;
       }
     } else if (type === "req") {
       if (!reqRecipient || reqAmount <= 0 || !reqDesc) {
         setErrorMessage("Please fill out all fields for request.");
+        console.log("errororror");
         return;
       }
     } else {
@@ -171,7 +183,7 @@ export default function GroupDetails({
     if (type === "pay") {
       setRecipient("");
       setAmount(0);
-      setDescription("");
+      setDesc("");
     } else if (type === "req") {
       setReqRecipient("");
       setReqAmount(0);
@@ -227,6 +239,8 @@ export default function GroupDetails({
 
     fetchGroupDetails();
   }, [id]);
+
+  const displayedTransactions = transactions.slice(0, 3);
 
   // Handle form submission for charging a user
   const handleChargeSubmit = async (type: string) => {
@@ -291,7 +305,7 @@ export default function GroupDetails({
           paid_by: paidByUserId, // The current user charging someone
           owed_by: recId, // The user selected to be charged
           amount: parseFloat(amount.toString()),
-          description,
+          description: desc,
           type: "pay", // Mark it as a charge, need to change this depending on what was clicked
           status: "pending",
           created_at: new Date(),
@@ -314,7 +328,7 @@ export default function GroupDetails({
     setAmount(0);
     setReqAmount(0);
 
-    setDescription("");
+    setDesc("");
     setReqDesc("");
     setLoading(false);
 
@@ -340,7 +354,8 @@ export default function GroupDetails({
   /**
    * pony up handle here
    */
-  const [refreshedTransactions, setRefreshedTransactions] = useState(transactions); // Store updated transactions
+  const [refreshedTransactions, setRefreshedTransactions] =
+    useState(transactions); // Store updated transactions
   const [updatedPonyUpUser, setUpdatedPonyUpUser] = useState(ponyUpUser); // Track the current state of Pony Up user
   const [showPonyUp, setShowPonyUp] = useState(true); // Track the visibility of the Pony Up card
   // Function to fetch updated transactions after payment
@@ -371,10 +386,10 @@ export default function GroupDetails({
 
   // Handle Pony Up (Pay button click)
   const handlePonyUp = async () => {
-
     try {
       // Get the authenticated user
-      const { data: userResponse, error: userError } = await supabase.auth.getUser();
+      const { data: userResponse, error: userError } =
+        await supabase.auth.getUser();
       if (userError || !userResponse?.user) {
         throw new Error("User is not authenticated");
       }
@@ -385,10 +400,10 @@ export default function GroupDetails({
       const { error: updateError } = await supabase
         .from("transactions")
         .update({ status: "paid" })
-        .eq("group_id", id)  // Match the group
-        .eq("owed_by", userId)  // The current user owes the ponyUpUser
-        .eq("paid_by", id)  // Match the ponyUpUser who is owed
-        .eq("status", "pending");  // Only update pending transactions
+        .eq("group_id", id) // Match the group
+        .eq("owed_by", userId) // The current user owes the ponyUpUser
+        .eq("paid_by", id) // Match the ponyUpUser who is owed
+        .eq("status", "pending"); // Only update pending transactions
 
       if (updateError) {
         throw new Error("Error updating transactions: " + updateError.message);
@@ -400,7 +415,6 @@ export default function GroupDetails({
       setShowPonyUp(false); // Hide the card
       // Here you can refresh the page or update the UI to remove the ponyUpUser card
       await fetchUpdatedTransactions();
-
     } catch (error) {
       setErrorMessage((error as Error).message);
       setLoading(false);
@@ -421,51 +435,24 @@ export default function GroupDetails({
 
       <Card className="bg-gray-800 border-gray-700 mb-6 flex justify-center">
         <CardContent className="p-4">
-          <p
-            className={`text-3xl font-bold ${balance < 0 ? "text-red-500" : "text-green-500"}`}
-          >
-            {balance < 0 ? "-" : ""}${Math.abs(balance).toFixed(2)}
-          </p>
+          <Balance transactions={transactions} />
         </CardContent>
       </Card>
 
       <h2 className="text-lg font-semibold mb-2">Your Transactions</h2>
       <div className="space-y-2 mb-6">
-        {displayedTransactions.map((transaction) => (
-          <div
-            key={transaction.id}
-            className="flex items-center justify-between bg-gray-800 p-3 rounded-lg"
-          >
-            <div className="flex items-center space-x-2 ">
-              <Avatar className="h-8 w-8 bg-gray-600">
-                <AvatarFallback>{transaction.user.initials}</AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-medium">{transaction.user.name}</p>
-                <p className="text-xs text-gray-400">
-                  {transaction.description}
-                </p>
-              </div>
-            </div>
-            <p
-              className={`font-semibold ${transaction.amount < 0 ? "text-red-500" : "text-green-500"}`}
+        <TransactionList displayedTransactions={displayedTransactions} />
+        {transactions.length > 2 && (
+          <Link href={`/group/${id}/transactions`} passHref>
+            <Button
+              variant="ghost"
+              className="flex row items-center justify-end w-full p-0"
             >
-              ${Math.abs(transaction.amount).toFixed(2)}
-            </p>
-          </div>
-        ))}
+              See All Transactions <ChevronRight size={20} />
+            </Button>
+          </Link>
+        )}
       </div>
-
-      {transactions.length > 2 && (
-        <Link href={`/group/${id}/transactions`} passHref>
-          <Button
-            variant="ghost"
-            className="flex row items-center justify-end w-full p-0"
-          >
-            See All Transactions <ChevronRight size={20} />
-          </Button>
-        </Link>
-      )}
 
       {/* <h2 className="text-lg font-semibold mb-2">Pony Up</h2>
       <Card className="bg-gray-800 border-gray-700">
@@ -492,23 +479,22 @@ export default function GroupDetails({
       {showPonyUp && ponyUpUser && (
         <>
           <h2 className="text-lg font-semibold mb-2">Pony Up</h2>
-          <Card className="bg-gray-800 border-gray-700">
+          <Card className="bg-gray-800 border-gray-700 w-1/2">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-semibold text-red-500">
+              <Badge variant="destructive" className="relative bottom-2 left-28">
+                <p className="font-semibold">
                   ${Math.abs(ponyUpUser.amount).toFixed(2)}
                 </p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Avatar className="h-12 w-12 bg-gray-600">
+              </Badge>
+              <div className="flex items-center space-x-2 flex-col">
+                <Avatar className="h-12 w-12 bg-gray-600 mb-2">
                   <AvatarFallback>{ponyUpUser.initials}</AvatarFallback>
                 </Avatar>
                 <div>
                   <p className="font-medium">{ponyUpUser.name}</p>
                   <Button
-                    variant="secondary"
                     size="sm"
-                    className="mt-1"
+                    className="w-full flex justify-center mt-4 rounded-full"
                     onClick={handlePonyUp}
                     disabled={loading}
                   >
@@ -570,8 +556,8 @@ export default function GroupDetails({
                       <Label htmlFor="desc">Description</Label>
                       <Input
                         id="desc"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
+                        value={desc}
+                        onChange={(e) => setDesc(e.target.value)}
                       />
                     </div>
                     <CardFooter>
