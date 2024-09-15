@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -116,6 +116,127 @@ export default function GroupDetails({
     setInviteLink(inviteLink);
   }
 
+  /*******************************
+   * pay and reques backend here *
+   * *****************************/
+
+  // Local state to manage group members, transactions, form data, and loading states
+  const [groupMembers, setGroupMembers] = useState<any[]>([]);
+  const [transactionsState, setTransactions] = useState<any[]>([]);
+  const [selectedUser, setSelectedUser] = useState<string>("");
+  const [amount, setAmount] = useState<number>(0);
+  const [description, setDescription] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [formVisible, setFormVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>("");
+
+  // Fetch group members and transactions for the group when the page loads
+  useEffect(() => {
+    const fetchGroupDetails = async () => {
+      setLoading(true);
+      const { data: userResponse, error: userError } = await supabase.auth.getUser();
+      const user = userResponse?.user;
+
+      if (!user) {
+        setErrorMessage("User is not authenticated");
+        setLoading(false);
+        return;
+      }
+
+      const userId = user.id;
+
+      // Fetch group members
+      const { data: members, error: membersError } = await supabase
+        .from("group_memberships")
+        .select("user_id")
+        .eq("group_id", id);
+
+      if (membersError || !members) {
+        setErrorMessage("Error fetching group members.");
+        setLoading(false);
+        return;
+      }
+
+      setGroupMembers(members);
+
+      // Fetch group transactions
+      const { data: txns, error: txnsError } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("group_id", id);
+
+      if (txnsError || !txns) {
+        setErrorMessage("Error fetching transactions.");
+        setLoading(false);
+        return;
+      }
+
+      setTransactions(txns);
+      setLoading(false);
+    };
+
+    fetchGroupDetails();
+  }, [id]);
+
+  // Handle form submission for charging a user
+  const handleChargeSubmit = async () => {
+    setLoading(true);
+    const { data: userResponse, error: userError } = await supabase.auth.getUser();
+    const user = userResponse?.user;
+
+    if (!user) {
+      setErrorMessage("User is not authenticated");
+      setLoading(false);
+      return;
+    }
+
+    const paidByUserId = user.id;
+
+    // Insert the transaction (charge) into the transactions table
+    const { data, error } = await supabase.from("transactions").insert([
+      {
+        group_id: id,
+        paid_by: paidByUserId,  // The current user charging someone
+        owed_by: selectedUser,  // The user selected to be charged
+        amount: parseFloat(amount.toString()),
+        description,
+        type: "charge",  // Mark it as a charge, need to change this depending on what was clicked
+        status: "pending",
+        created_at: new Date(),
+      },
+    ]);
+
+    if (error) {
+      setErrorMessage("Error charging user: " + error.message);
+      setLoading(false);
+      return;
+    }
+
+    // Clear the form and hide it
+    setSelectedUser("");
+    setAmount(0);
+    setDescription("");
+    setFormVisible(false);
+    setLoading(false);
+
+    // Reload the transactions list
+    const { data: txns, error: txnsError } = await supabase
+      .from("transactions")
+      .select("*")
+      .eq("group_id", id);
+
+    if (txnsError || !txns) {
+      setErrorMessage("Error fetching updated transactions.");
+      setLoading(false);
+      return;
+    }
+
+    setTransactions(txns);
+  };
+
+  /**********************************
+   * pay/request backend ends
+   **********************************/
   return (
     <div className="bg-gray-900 text-white p-4 min-h-screen w-full mx-auto">
       <div className="flex justify-between items-center mb-4">
