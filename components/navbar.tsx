@@ -22,15 +22,11 @@ import {
 import Link from "next/link";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { signOutAction } from "@/app/actions";
+import { useGroups } from "@/app/GroupsContext";
 
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
-
-  const groups = [
-    { id: 1, name: "Beach Trip '24" },
-    { id: 2, name: "Birthday Party" },
-    { id: 3, name: "Spring Break" },
-  ];
+  const { groups } = useGroups();
 
   const handleSignOut = () => {
     setIsOpen(false);

@@ -28,12 +28,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="min-h-screen flex flex-col">
-            <Navigation />
-            <main className="flex-1 flex flex-col max-w-5xl w-full mx-auto px-5 py-8 overflow-hidden">
-              <GroupsProviderClient>{children}</GroupsProviderClient>
-            </main>
-          </div>
+          <GroupsProviderClient>
+            <div className="min-h-screen flex flex-col">
+              <Navigation />
+              <main className="flex-1 flex flex-col max-w-5xl w-full mx-auto px-5 py-8 overflow-hidden">
+                {children}
+              </main>
+            </div>
+          </GroupsProviderClient>
         </ThemeProvider>
       </body>
     </html>
