@@ -4,24 +4,13 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  PenSquare,
-  Plus,
-  ChevronRight,
-  UserPlus,
-  DollarSign,
-  HandCoins,
-} from "lucide-react";
+import { PenSquare, Plus, ChevronRight, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { Copy } from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 
 import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { v4 as uuidv4 } from "uuid";
 
 import {
   Dialog,
@@ -37,19 +26,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { createClient } from "@/utils/supabase/client";
-import { v4 as uuidv4 } from "uuid";
 import { Combobox } from "./ui/combobox";
 import TransactionList from "./transaction-list";
 import Balance from "./balance";
 import { Badge } from "./ui/badge";
+import {
+  create_invite,
+  fetchGroupDetails,
+  handleChargeSubmit,
+} from "@/app/api/actions";
+import { Transaction } from "@/types";
 
 const supabase = createClient();
-
-type invite = {
-  id?: string;
-  group_id: string;
-  inviter_id: string;
-};
 
 type GroupDetailsProps = {
   id: string;
@@ -68,66 +56,15 @@ export default function GroupDetails({
   balance,
   ponyUpUser,
 }: GroupDetailsProps) {
-  // Show only the first 3 transactions
+  /* Handle Invite Creation */
+  const [inviteLink, setInviteLink] = useState<string>("");
 
-  async function getUserById(userId: string) {
-    const { data, error } = await supabase
-      .from("users")
-      .select("first_name, last_name")
-      .eq("id", userId)
-      .single(); // Assuming emails are unique
+  const handleCreateInvite = async () => {
+    const invite = await create_invite(id);
 
-    if (error) {
-      console.error("Error fetching user:", error.message);
-      return null;
-    }
-
-    if (!data) {
-      console.error("No data found for the provided uuid.");
-      return null;
-    }
-
-    return data;
-  }
-
-  const [inviteLink, setInviteLink] = useState("");
-
-  async function create_invite() {
-    // Retrieve the user from Supabase auth
-    const { data: userResponse, error: userError } =
-      await supabase.auth.getUser();
-
-    if (userError) {
-      console.error("Error fetching user:", userError);
-      return "error: Not authenticated";
-    }
-
-    const user = userResponse?.user;
-    if (!user) {
-      console.error("User not found");
-      return "error: Not authenticated";
-    }
-
-    const userId = user.id; // Access the user ID
-
-    // console.log(id);
-
-    // Insert the new invitation into the 'invitations' table, Supabase generates the UUID automatically
-    let inviteuuid = uuidv4();
-    const { data, error } = await supabase
-      .from("invitations")
-      .insert([{ id: inviteuuid, group_id: id, inviter_id: userId }]);
-
-    if (error) {
-      console.error("Error creating invitation:", error);
-      return "error: Error creating invitation";
-    }
-
-    // Use the UUID `id` from the newly created invitation as the token
-    const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/join-group/${inviteuuid}`;
-
-    setInviteLink(inviteLink);
-  }
+    if (invite) setInviteLink(invite);
+    else setInviteLink("Error, try again");
+  };
 
   /*******************************
    * pay and reques backend here *
@@ -136,10 +73,7 @@ export default function GroupDetails({
   // Local state to manage group members, transactions, form data, and loading states
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [selectedUser, setSelectedUser] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [formVisible, setFormVisible] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string>("");
 
   const [recipient, setRecipient] = useState("John Doe");
   const [amount, setAmount] = useState(0.0);
@@ -153,22 +87,17 @@ export default function GroupDetails({
     event: React.FormEvent<HTMLFormElement>,
     type: string
   ) => {
-    event.preventDefault(); // Prevent the default form submission behavior
-
-    console.log("handle submit called", type);
+    event.preventDefault();
 
     // Validate form inputs
     if (type === "pay") {
-      console.log("pay");
       if (!recipient || amount <= 0 || !desc) {
-        console.log("errororror");
-        setErrorMessage("Please fill out all fields for payment.");
+        console.log("Please fill out all fields for payment.");
         return;
       }
     } else if (type === "req") {
       if (!reqRecipient || reqAmount <= 0 || !reqDesc) {
-        setErrorMessage("Please fill out all fields for request.");
-        console.log("errororror");
+        console.log("Please fill out all fields for request.");
         return;
       }
     } else {
@@ -176,10 +105,8 @@ export default function GroupDetails({
       return;
     }
 
-    // Call the handleChargeSubmit function with the appropriate type
-    await handleChargeSubmit(type);
+    handleNewTransaction(type);
 
-    // Optionally reset form fields and close the dialog
     if (type === "pay") {
       setRecipient("");
       setAmount(0);
@@ -191,238 +118,63 @@ export default function GroupDetails({
     }
   };
 
-  // Fetch group members and transactions for the group when the page loads
-  useEffect(() => {
-    const fetchGroupDetails = async () => {
-      setLoading(true);
-      const { data: userResponse, error: userError } =
-        await supabase.auth.getUser();
-      const user = userResponse?.user;
-
-      if (!user) {
-        setErrorMessage("User is not authenticated");
-        setLoading(false);
-        return;
-      }
-
-      const userId = user.id;
-
-      // Fetch group members
-      const { data: members, error: membersError } = await supabase
-        .from("group_memberships")
-        .select("user_id")
-        .eq("group_id", id);
-
-      if (membersError || !members) {
-        setErrorMessage("Error fetching group members.");
-        setLoading(false);
-        return;
-      }
-
-      setGroupMembers(members);
-
-      // Fetch group transactions
-      const { data: txns, error: txnsError } = await supabase
-        .from("transactions")
-        .select("*")
-        .eq("group_id", id);
-
-      if (txnsError || !txns) {
-        setErrorMessage("Error fetching transactions.");
-        setLoading(false);
-        return;
-      }
-
-      setTransactions(txns);
-      setLoading(false);
-    };
-
-    fetchGroupDetails();
-  }, [id]);
-
-  const displayedTransactions = transactions.slice(0, 3);
-
   // Handle form submission for charging a user
-  const handleChargeSubmit = async (type: string) => {
-    setLoading(true);
+  const handleNewTransaction = async (type: string) => {
+    let currAmount = type === "pay" ? amount : reqAmount;
+    let currDesc = type === "pay" ? desc : reqDesc;
     const { data: userResponse, error: userError } =
       await supabase.auth.getUser();
+
+    if (userError) {
+      console.error("Error fetching user:", userError);
+      return null;
+    }
+
     const user = userResponse?.user;
-
     if (!user) {
-      setErrorMessage("User is not authenticated");
-      setLoading(false);
-      return;
+      console.error("User not found");
+      return null;
     }
 
-    const paidByUserId = user.id;
+    const userId = user.id; // Access the user ID
 
-    async function getUserIdFromEmail(email: string): Promise<string | null> {
-      // Query the 'users' table to get the user ID associated with the email
-      const { data, error } = await supabase
-        .from("users")
-        .select("id")
-        .eq("email", email)
-        .single(); // Assuming emails are unique
+    const newTransaction = {
+      id: uuidv4(),
+      type,
+      recipientID: recipient,
+      ownerID: userId,
+      groupID: id,
+      amount: currAmount,
+      description: currDesc,
+    };
 
-      if (error || !data) {
-        console.error("Error fetching user ID:", error);
-        return null;
-      }
-
-      return data.id;
-    }
-
-    const recId = await getUserIdFromEmail(reqRecipient);
-
-    console.log(recId);
-
-    if (type === "req") {
-      // Insert the transaction (charge) into the transactions table
-      const { data, error } = await supabase.from("transactions").insert([
-        {
-          group_id: id,
-          paid_by: paidByUserId, // The current user charging someone
-          owed_by: recId, // The user selected to be charged
-          amount: parseFloat(reqAmount.toString()),
-          description: reqDesc,
-          type: "charge", // Mark it as a charge, need to change this depending on what was clicked
-          status: "pending",
-          created_at: new Date(),
-        },
-      ]);
-
-      if (error) {
-        setErrorMessage("Error charging user: " + error.message);
-        setLoading(false);
-        return;
-      }
-    } else if (type === "pay") {
-      const recId = await getUserIdFromEmail(recipient);
-      const { data, error } = await supabase.from("transactions").insert([
-        {
-          group_id: id,
-          paid_by: paidByUserId, // The current user charging someone
-          owed_by: recId, // The user selected to be charged
-          amount: parseFloat(amount.toString()),
-          description: desc,
-          type: "pay", // Mark it as a charge, need to change this depending on what was clicked
-          status: "pending",
-          created_at: new Date(),
-        },
-      ]);
-
-      if (error) {
-        setErrorMessage("Error charging user: " + error.message);
-        setLoading(false);
-        return;
-      }
-    } else {
-      console.error("Transaction failed");
-    }
-
-    // Clear the form and hide it
-    setRecipient("");
-    setReqRecipient("");
-
-    setAmount(0);
-    setReqAmount(0);
-
-    setDesc("");
-    setReqDesc("");
-    setLoading(false);
-
-    // Reload the transactions list
-    const { data: txns, error: txnsError } = await supabase
-      .from("transactions")
-      .select("*")
-      .eq("group_id", id);
-
-    if (txnsError || !txns) {
-      setErrorMessage("Error fetching updated transactions.");
-      setLoading(false);
-      return;
-    }
-
-    setTransactions(txns);
+    handleChargeSubmit(newTransaction);
   };
+
+  // Fetch group members and transactions for the group when the page loads
+  useEffect(() => {
+    const handleFetchGroupDetails = async () => {
+      const details = await fetchGroupDetails(id);
+      if (details) {
+        setGroupMembers(details.members);
+        setTransactions(details.transactions);
+      }
+    };
+
+    handleFetchGroupDetails();
+  }, [id]);
+
+  useEffect(() => {
+    setDisplayedTransactions(transactions.slice(0, 3));
+  }, [transactions]);
+
+  const [displayedTransactions, setDisplayedTransactions] = useState<
+    Transaction[]
+  >([]);
 
   /**********************************
    * pay/request backend ends
    **********************************/
-
-  /**
-   * pony up handle here
-   */
-  const [refreshedTransactions, setRefreshedTransactions] =
-    useState(transactions); // Store updated transactions
-  const [updatedPonyUpUser, setUpdatedPonyUpUser] = useState(ponyUpUser); // Track the current state of Pony Up user
-  const [showPonyUp, setShowPonyUp] = useState(true); // Track the visibility of the Pony Up card
-  // Function to fetch updated transactions after payment
-  const fetchUpdatedTransactions = async () => {
-    const { data: updatedTxns, error } = await supabase
-      .from("transactions")
-      .select("*")
-      .eq("group_id", id);
-
-    if (error) {
-      setErrorMessage("Error fetching updated transactions.");
-      return;
-    }
-
-    // Update the state with the newly fetched transactions
-    setRefreshedTransactions(updatedTxns);
-
-    // Check if there are any remaining pending payments
-    const pendingUser = updatedTxns.find(
-      (txn) => txn.paid_by === id && txn.status === "pending"
-    );
-
-    // Update the Pony Up card only if there are pending transactions for the user
-    if (!pendingUser) {
-      //setUpdatedPonyUpUser(null); // No pending transactions, remove the Pony Up user card
-    }
-  };
-
-  // Handle Pony Up (Pay button click)
-  const handlePonyUp = async () => {
-    try {
-      // Get the authenticated user
-      const { data: userResponse, error: userError } =
-        await supabase.auth.getUser();
-      if (userError || !userResponse?.user) {
-        throw new Error("User is not authenticated");
-      }
-
-      const userId = userResponse.user.id;
-
-      // Update the transactions where the logged-in user is "owed" by ponyUpUser
-      const { error: updateError } = await supabase
-        .from("transactions")
-        .update({ status: "paid" })
-        .eq("group_id", id) // Match the group
-        .eq("owed_by", userId) // The current user owes the ponyUpUser
-        .eq("paid_by", id) // Match the ponyUpUser who is owed
-        .eq("status", "pending"); // Only update pending transactions
-
-      if (updateError) {
-        throw new Error("Error updating transactions: " + updateError.message);
-      }
-
-      // After successful payment, refresh or hide the Pony Up card
-      setLoading(false);
-      alert("Transaction marked as paid!");
-      setShowPonyUp(false); // Hide the card
-      // Here you can refresh the page or update the UI to remove the ponyUpUser card
-      await fetchUpdatedTransactions();
-    } catch (error) {
-      setErrorMessage((error as Error).message);
-      setLoading(false);
-    }
-  };
-  /**
-   * End pony handle
-   */
 
   return (
     <div className="bg-gray-900 text-white p-4 min-h-screen w-full mx-auto">
@@ -454,58 +206,31 @@ export default function GroupDetails({
         )}
       </div>
 
-      {/* <h2 className="text-lg font-semibold mb-2">Pony Up</h2>
-      <Card className="bg-gray-800 border-gray-700">
+      <h2 className="text-lg font-semibold mb-2">Pony Up</h2>
+      <Card className="bg-gray-800 border-gray-700 w-1/2">
         <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="font-semibold text-red-500">
+          <Badge variant="destructive" className="relative bottom-2 left-28">
+            <p className="font-semibold">
               ${Math.abs(ponyUpUser.amount).toFixed(2)}
             </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Avatar className="h-12 w-12 bg-gray-600">
+          </Badge>
+          <div className="flex items-center space-x-2 flex-col">
+            <Avatar className="h-12 w-12 bg-gray-600 mb-2">
               <AvatarFallback>{ponyUpUser.initials}</AvatarFallback>
             </Avatar>
             <div>
               <p className="font-medium">{ponyUpUser.name}</p>
-              <Button variant="secondary" size="sm" className="mt-1" onClick={handlePonyUp}>
-                Pay
+              <Button
+                size="sm"
+                className="w-full flex justify-center mt-4 rounded-full"
+                disabled={loading}
+              >
+                {loading ? "Processing..." : "Pay"}
               </Button>
             </div>
           </div>
         </CardContent>
-      </Card> */}
-
-      {showPonyUp && ponyUpUser && (
-        <>
-          <h2 className="text-lg font-semibold mb-2">Pony Up</h2>
-          <Card className="bg-gray-800 border-gray-700 w-1/2">
-            <CardContent className="p-4">
-              <Badge variant="destructive" className="relative bottom-2 left-28">
-                <p className="font-semibold">
-                  ${Math.abs(ponyUpUser.amount).toFixed(2)}
-                </p>
-              </Badge>
-              <div className="flex items-center space-x-2 flex-col">
-                <Avatar className="h-12 w-12 bg-gray-600 mb-2">
-                  <AvatarFallback>{ponyUpUser.initials}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium">{ponyUpUser.name}</p>
-                  <Button
-                    size="sm"
-                    className="w-full flex justify-center mt-4 rounded-full"
-                    onClick={handlePonyUp}
-                    disabled={loading}
-                  >
-                    {loading ? "Processing..." : "Pay"}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </>
-      )}
+      </Card>
 
       {/* pay request form */}
 
@@ -624,7 +349,7 @@ export default function GroupDetails({
             variant="ghost"
             size="icon"
             className="fixed bottom-4 left-4 bg-slate-700 hover:bg-slate-800 rounded-full h-12 w-12"
-            onClick={create_invite}
+            onClick={handleCreateInvite}
           >
             <UserPlus className="h-6 w-6" />
           </Button>

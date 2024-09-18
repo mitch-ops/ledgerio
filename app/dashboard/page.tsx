@@ -26,72 +26,19 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { useGroups } from "../GroupsContext";
+import { fetchUserName } from "../api/actions";
 
-type GroupProps = {
-  id: string;
-  name: string;
-  members: number;
-  amount: number;
-};
-
-const supabase = createClient();
 export default function Dashboard() {
   const { groups, isLoading } = useGroups();
-  const [name, setName] = useState<string | null>("User");
+  const [name, setName] = useState<string | null>("");
 
   useEffect(() => {
-    async function getUserIdFromEmail(email: string): Promise<string | null> {
-      try {
-        // Query the 'users' table to get the user first name associated with the email
-        const { data, error } = await supabase
-          .from("users")
-          .select("first_name")
-          .eq("email", email)
-          .single(); // Assuming emails are unique
+    const fetchAndSetName = async () => {
+      const fetchedName = await fetchUserName();
+      setName(fetchedName);
+    };
 
-        if (error) {
-          console.error("Error fetching user first name:", error.message);
-          return null;
-        }
-
-        if (!data) {
-          console.error("No data found for the provided email.");
-          return null;
-        }
-
-        return data.first_name;
-      } catch (err) {
-        console.error("Unexpected error fetching user first name:", err);
-        return null;
-      }
-    }
-
-    async function fetchUserName() {
-      try {
-        const { data: userResponse, error: userError } =
-          await supabase.auth.getUser();
-
-        if (userError) {
-          console.error("Error fetching user:", userError.message);
-          return;
-        }
-
-        if (!userResponse || !userResponse.user || !userResponse.user.email) {
-          console.error("No user or email found.");
-          return;
-        }
-
-        const userEmail = userResponse.user.email;
-        const userName = await getUserIdFromEmail(userEmail);
-        if (userName) {
-          setName(userName);
-        }
-      } catch (err) {
-        console.error("Unexpected error fetching user:", err);
-      }
-    }
-
-    fetchUserName();
+    fetchAndSetName();
   }, []);
 
   return (
@@ -113,7 +60,9 @@ export default function Dashboard() {
                       <h3 className="font-semibold">{group.name}</h3>
                     </div>
                     <DropdownMenu>
-                      <DropdownMenuTrigger className="">...</DropdownMenuTrigger>
+                      <DropdownMenuTrigger className="">
+                        ...
+                      </DropdownMenuTrigger>
                       <DropdownMenuContent>
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
@@ -138,7 +87,7 @@ export default function Dashboard() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle>Edit profile</DialogTitle>
+                <DialogTitle>Create Group</DialogTitle>
                 <DialogDescription>
                   Give your group a cool name. You can change it later.
                 </DialogDescription>

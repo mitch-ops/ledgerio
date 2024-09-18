@@ -1,17 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Avatar, AvatarFallback } from "./ui/avatar";
-
-export type Transaction = {
-  id: string;
-  group_id: string;
-  paid_by: string;
-  owed_by: string;
-  amount: number;
-  description: string;
-  status: string;
-  type: string;
-};
+import { Transaction } from "@/types";
+import { getUserIdFromEmail } from "@/app/api/actions";
 
 type TransactionListProps = {
   displayedTransactions: Transaction[];
@@ -56,8 +47,10 @@ const TransactionList = ({ displayedTransactions }: TransactionListProps) => {
     const fetchUserDetails = async () => {
       const userDetailsPromises = displayedTransactions.map(
         async (transaction) => {
-          const userDetails = await getUserById(transaction.owed_by);
-          return { userId: transaction.owed_by, userDetails };
+          const userID = await getUserIdFromEmail(transaction.recipientID);
+          let userDetails;
+          if (userID) userDetails = await getUserById(userID);
+          return { userId: userID, userDetails: userDetails || null }; // Ensure userDetails is null if undefined
         }
       );
 
@@ -66,7 +59,7 @@ const TransactionList = ({ displayedTransactions }: TransactionListProps) => {
       // Transform the array into a map for easier access
       const userDetailsMap: UserDetailsMap = userDetailsArray.reduce(
         (acc: UserDetailsMap, { userId, userDetails }) => {
-          acc[userId] = userDetails;
+          if (userId) acc[userId] = userDetails;
           return acc;
         },
         {} as UserDetailsMap
@@ -81,40 +74,50 @@ const TransactionList = ({ displayedTransactions }: TransactionListProps) => {
   return (
     <div>
       {displayedTransactions.map((transaction) => {
-        const userDetails = userDetailsMap[transaction.owed_by];
+        const userDetails = userDetailsMap[transaction.recipientID];
 
         return (
-          <div
-            key={transaction.id}
-            className="flex items-center justify-between bg-gray-800 p-3 rounded-lg m-2"
-          >
-            <div className="flex items-center space-x-2">
-              <Avatar className="h-8 w-8 bg-gray-600">
-                <AvatarFallback>
-                  {userDetails &&
-                    `${userDetails.first_name.slice(0, 1)}${userDetails.last_name.slice(0, 1)}`}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                {userDetails ? (
-                  <>
-                    <p className="font-medium">
-                      {userDetails.first_name} {userDetails.last_name}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {transaction.description}
-                    </p>
-                  </>
-                ) : (
-                  <p>Loading...</p>
-                )}
-              </div>
-            </div>
-            <p
-              className={`font-semibold ${transaction.type === "pay" ? "text-red-500" : "text-green-500"}`}
-            >
-              ${Math.abs(transaction.amount).toFixed(2)}
-            </p>
+          <div>
+            {displayedTransactions.map((transaction) => {
+              const userDetails = userDetailsMap[transaction.recipientID];
+
+              return (
+                <div
+                  key={transaction.id} // Ensure transaction.id is unique
+                  className="flex items-center justify-between bg-gray-800 p-3 rounded-lg m-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <Avatar className="h-8 w-8 bg-gray-600">
+                      <AvatarFallback key={transaction.recipientID}>
+                        {" "}
+                        {/* Ensure unique key here */}
+                        {userDetails &&
+                          `${userDetails.first_name.slice(0, 1)}${userDetails.last_name.slice(0, 1)}`}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      {userDetails ? (
+                        <>
+                          <p className="font-medium">
+                            {userDetails.first_name} {userDetails.last_name}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {transaction.description}
+                          </p>
+                        </>
+                      ) : (
+                        <p>Loading...</p>
+                      )}
+                    </div>
+                  </div>
+                  <p
+                    className={`font-semibold ${transaction.type === "pay" ? "text-red-500" : "text-green-500"}`}
+                  >
+                    ${Math.abs(transaction.amount).toFixed(2)}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         );
       })}

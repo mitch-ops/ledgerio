@@ -30,7 +30,6 @@ export const signUpAction = async (formData: FormData) => {
     console.error(signUpError.code + " " + signUpError.message);
     return encodedRedirect("error", "/sign-up", signUpError.message);
   }
-
   if (data && data.user) {
     // Insert the user into the custom users table
     const { data: insertResponse, error: insertError } = await supabase
@@ -61,6 +60,23 @@ export const signUpAction = async (formData: FormData) => {
     "/sign-up",
     "Thanks for signing up! Please check your email for a verification link."
   );
+};
+
+export const signInAction = async (formData: FormData) => {
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+  const supabase = createClient();
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    return encodedRedirect("error", "/sign-in", error.message);
+  }
+
+  return encodedRedirect("success", "/sign-in", "Successfully signed in");
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
